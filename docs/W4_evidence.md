@@ -2,8 +2,6 @@
 
 ## Section 1 — Cover
 
-- **Số nhóm:** Truc
-- **Thành viên:** Truc
 - **LLM sử dụng:** Claude Sonnet 4 qua Amazon Bedrock
 - **Framework sử dụng:** Raw API: FastAPI + boto3 + Bedrock Knowledge Bases Retrieve API. Không dùng LangChain và không dùng Bedrock Agents.
 - **Repo / thư mục nộp:** `geekbrain-w4-truc-local`
