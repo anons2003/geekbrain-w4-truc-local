@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sys
 import uuid
@@ -12,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+import boto3
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -36,31 +38,6 @@ from scripts.l3_tool_augmented_rag_truc import DEFAULT_DB_PATH, GeekBrainTools, 
 
 
 KB_DIR = ROOT / "data_package" / "knowledge_base"
-MONTHS = {
-    "jan": 1,
-    "january": 1,
-    "feb": 2,
-    "february": 2,
-    "mar": 3,
-    "march": 3,
-    "apr": 4,
-    "april": 4,
-    "may": 5,
-    "jun": 6,
-    "june": 6,
-    "jul": 7,
-    "july": 7,
-    "aug": 8,
-    "august": 8,
-    "sep": 9,
-    "september": 9,
-    "oct": 10,
-    "october": 10,
-    "nov": 11,
-    "november": 11,
-    "dec": 12,
-    "december": 12,
-}
 
 
 def load_team_directory() -> dict[str, dict[str, str]]:
@@ -103,6 +80,13 @@ class ChatResponse(BaseModel):
     sources: list[dict[str, Any]] = Field(default_factory=list)
     evidence: dict[str, Any] = Field(default_factory=dict)
     memory: dict[str, Any] = Field(default_factory=dict)
+
+
+class RouteDecision(BaseModel):
+    route: str
+    reason: str
+    rewritten_question: str
+    service: str | None = None
 
 
 def get_session(session_id: str | None) -> tuple[str, dict[str, Any]]:
@@ -151,6 +135,63 @@ def compact_memory(session: dict[str, Any]) -> dict[str, Any]:
     return {"state": {key: state[key] for key in keys if key in state}, "recent_turns": session.get("turns", [])[-3:]}
 
 
+def call_router_model(prompt: str) -> str:
+    # Router chỉ chọn route, không được sinh câu trả lời cuối.
+    session = boto3.Session(profile_name=DEFAULT_PROFILE, region_name=DEFAULT_REGION) if DEFAULT_PROFILE else boto3.Session(region_name=DEFAULT_REGION)
+    client = session.client("bedrock-runtime")
+    response = client.converse(
+        modelId=DEFAULT_MODEL_ID,
+        system=[{"text": "You are a routing controller. Return only compact JSON. Do not answer the user's question."}],
+        messages=[{"role": "user", "content": [{"text": prompt}]}],
+        inferenceConfig={"maxTokens": 400, "temperature": 0.0},
+    )
+    return response["output"]["message"]["content"][0]["text"]
+
+
+def parse_router_json(raw: str) -> dict[str, Any]:
+    # Claude đôi khi bọc JSON bằng text; chỉ lấy object JSON đầu tiên.
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        raise ToolError("Router did not return JSON")
+    return json.loads(match.group(0))
+
+
+def ai_route(question: str, session: dict[str, Any], tools: GeekBrainTools) -> RouteDecision:
+    # AI router thay cho hard match: model quyết định dùng RAG, DB tool, memory hay agent reasoning.
+    services = tools.list_services()
+    prompt = f"""
+User question:
+{question}
+
+Compact session memory:
+{json.dumps(compact_memory(session), ensure_ascii=False)}
+
+Known services from database:
+{json.dumps(services)}
+
+Available routes:
+- rag: simple or conflict-aware knowledge-base retrieval questions.
+- l3_tools: questions requiring numeric, structured, cost, metric, SLA, incident, or database-backed answers.
+- l4_memory: follow-up questions that depend on previous turns, pronouns, remembered service/month/team/incident, or conversation context.
+- agent_reasoning: open-ended investigation or reliability assessment that needs a plan and multiple evidence sources.
+
+Return only JSON with this schema:
+{{"route":"rag|l3_tools|l4_memory|agent_reasoning","reason":"short reason","rewritten_question":"standalone question if useful, otherwise original","service":"service name if one is relevant, otherwise null"}}
+"""
+    try:
+        data = parse_router_json(call_router_model(prompt))
+    except Exception:
+        data = {"route": "rag", "reason": "Router unavailable; defaulted to RAG.", "rewritten_question": question, "service": None}
+    route = data.get("route", "rag")
+    if route not in {"rag", "l3_tools", "l4_memory", "agent_reasoning"}:
+        route = "rag"
+    rewritten = data.get("rewritten_question") or question
+    service = data.get("service")
+    if service not in services:
+        service = None
+    return RouteDecision(route=route, reason=data.get("reason", ""), rewritten_question=rewritten, service=service)
+
+
 def resolve_followup(question: str, session: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     # Biến câu follow-up mơ hồ thành câu có ngữ cảnh rõ hơn trước khi retrieve/gọi tool.
     state = session.get("state", {})
@@ -168,12 +209,6 @@ def resolve_followup(question: str, session: dict[str, Any]) -> tuple[str, dict[
     return " ".join(parts), refs
 
 
-def is_followup(question: str) -> bool:
-    # Heuristic đơn giản để nhận diện câu hỏi phụ thuộc lượt trước.
-    q = question.lower()
-    return bool(re.search(r"\b(it|its|that|this|their|they|same issue|that month|that service)\b", q) or "which team" in q or "overdue" in q)
-
-
 def find_incident_service(incident_id: str) -> str | None:
     # Resolve incident -> service từ database trước, fallback sang metadata trong postmortem markdown.
     db_path = ROOT / DEFAULT_DB_PATH
@@ -186,42 +221,6 @@ def find_incident_service(incident_id: str) -> str | None:
         match = re.search(r"^service:\s*(.+)$", text, re.MULTILINE)
         if match:
             return match.group(1).strip()
-    return None
-
-
-def infer_year_from_text(text: str) -> int:
-    match = re.search(r"\b(20\d{2})\b", text)
-    return int(match.group(1)) if match else date.today().year
-
-
-def parse_due_date(raw_due: str, text: str) -> str | None:
-    # Chuyển due date trong markdown từ dạng chữ hoặc ISO sang ISO date.
-    clean = raw_due.strip()
-    iso_match = re.search(r"\b(20\d{2})-(\d{2})-(\d{2})\b", clean)
-    if iso_match:
-        return iso_match.group(0)
-    match = re.search(r"\b([A-Za-z]+)\s+(\d{1,2})(?:,\s*(20\d{2}))?\b", clean)
-    if not match:
-        return None
-    month = MONTHS.get(match.group(1).lower())
-    if not month:
-        return None
-    year = int(match.group(3)) if match.group(3) else infer_year_from_text(text)
-    return date(year, month, int(match.group(2))).isoformat()
-
-
-def postmortem_deadline(incident_id: str) -> dict[str, Any] | None:
-    # Lookup deadline trong postmortem markdown; không khóa vào một incident/date cụ thể.
-    for path in KB_DIR.glob(f"postmortem_{incident_id.replace('-', '')}*.md"):
-        text = path.read_text()
-        for line in text.splitlines():
-            if line.startswith("|") and "review" in line.lower():
-                cells = [cell.strip() for cell in line.strip("|").split("|")]
-                if len(cells) < 5 or cells[0] in {"#", "---"}:
-                    continue
-                due = parse_due_date(cells[3], text)
-                if due:
-                    return {"source": path.name, "action": cells[1], "owner": cells[2], "due": due, "status": cells[4]}
     return None
 
 
@@ -239,7 +238,7 @@ def rag_answer(question: str, session: dict[str, Any] | None = None) -> dict[str
     context = build_context(results)
     if session:
         # Với L4, compact memory được prepend vào context để resolve đại từ/follow-up.
-        context = f"SESSION MEMORY:\n{compact_memory(session)}\n\n{context}"
+        context = f"CURRENT DATE: {date.today().isoformat()}\nSESSION MEMORY:\n{compact_memory(session)}\n\n{context}"
     try:
         # Prompt được tự build để kiểm soát citation/conflict rules thay vì dùng RetrieveAndGenerate.
         answer = ask_claude(question, context, DEFAULT_PROFILE, DEFAULT_REGION, DEFAULT_MODEL_ID)
@@ -273,44 +272,8 @@ def extractive_fallback_answer(results: list[dict[str, Any]]) -> str:
 
 def l4_answer(question: str, session: dict[str, Any], tools: GeekBrainTools) -> dict[str, Any]:
     # L4 xử lý multi-turn: đọc memory trước, resolve reference, rồi mới chọn retrieval/tool.
-    if not is_followup(question):
-        raise ToolError("Not a follow-up")
-    state = session.get("state", {})
     resolved, refs = resolve_followup(question, session)
-    q = question.lower()
-    if "which team" in q and state.get("last_service"):
-        # Câu "Which team is responsible?" dùng last_service trong memory và team_*.md đã parse.
-        service = state["last_service"]
-        info = SERVICE_TEAM.get(service)
-        if not info:
-            raise ToolError("No team metadata for remembered service")
-        return {
-            "answer": f"{service} is owned by {info['team']}, led by {info['lead']}.",
-            "tools": ["Memory", "Team Directory"],
-            "sources": [{"source": info["source"], "status": "unknown", "score": 1.0}],
-            "evidence": {"resolved_question": resolved, "references": refs, "team_directory": info},
-            "updates": {"last_team": info["team"], "last_team_lead": info["lead"]},
-            "pipeline_steps": [{"step": "Read compact memory", "detail": compact_memory(session)}, {"step": "Resolve references", "detail": refs}, {"step": "Use team directory", "detail": info}],
-        }
-    if "overdue" in q and state.get("last_incident"):
-        # Câu deadline dùng incident đã nhớ từ lượt trước để tìm đúng postmortem.
-        deadline = postmortem_deadline(state["last_incident"])
-        if not deadline:
-            raise ToolError("No postmortem deadline")
-        due = date.fromisoformat(deadline["due"])
-        today = date.today()
-        days = (today - due).days
-        overdue_text = "past due" if days > 0 else "not overdue"
-        return {
-            "answer": f"Based on the postmortem action item, {deadline['action']} was due on {deadline['due']}. Its status is {deadline['status']}, so it is {overdue_text} as of {today.isoformat()} ({abs(days)} days {'after' if days > 0 else 'before'} the due date).",
-            "tools": ["Memory", "Postmortem File Lookup", "Date Reasoning"],
-            "sources": [{"source": deadline["source"], "status": "unknown", "score": 1.0}],
-            "evidence": {"resolved_question": resolved, "references": refs, "deadline": deadline, "days_overdue": days},
-            "updates": {"last_deadline": deadline["due"], "last_deadline_label": deadline["action"]},
-            "pipeline_steps": [{"step": "Read compact memory", "detail": compact_memory(session)}, {"step": "Find postmortem deadline", "detail": deadline}, {"step": "Compare deadline to date", "detail": today.isoformat()}],
-        }
     result = rag_answer(resolved, session)
-    # Nếu không match rule đặc biệt, dùng RAG nhưng vẫn truyền câu đã resolve + memory.
     result["tools"] = ["Memory", *result["tools"]]
     result["evidence"] = {"resolved_question": resolved, "references": refs}
     result["pipeline_steps"] = [{"step": "Read compact memory", "detail": compact_memory(session)}, {"step": "Resolve references", "detail": refs}, *result["pipeline_steps"]]
@@ -349,11 +312,11 @@ def service_operational_evidence(tools: GeekBrainTools, service: str) -> dict[st
     return {"service": service, "latest_metrics": metrics, "sla_targets": targets, "recent_incidents": incidents}
 
 
-def bonus_b(question: str, tools: GeekBrainTools) -> dict[str, Any]:
+def bonus_b(question: str, tools: GeekBrainTools, routed_service: str | None = None) -> dict[str, Any]:
     # Bonus B: agent reasoning dùng plan + evidence thật từ DB/KB, không trả answer cố định.
-    service = mentioned_service_from_tools(tools, question)
-    if not service or not re.search(r"\b(healthy|health|reliability|assess|investigate)\b", question.lower()):
-        raise ToolError("Not Bonus B")
+    service = routed_service or mentioned_service_from_tools(tools, question)
+    if not service:
+        raise ToolError("Agent reasoning route requires a service in the routed question")
     evidence = service_operational_evidence(tools, service)
     retrieval = rag_answer(f"{question}\nFocus service: {service}. Include source citations.", None)
     investigation_context = (
@@ -403,30 +366,63 @@ def health() -> dict[str, Any]:
     return {"status": "ok", "kb_id": DEFAULT_KB_ID, "model_id": DEFAULT_MODEL_ID, "database": str(ROOT / DEFAULT_DB_PATH)}
 
 
+def forced_route(mode: str, question: str) -> RouteDecision | None:
+    # UI vẫn cho phép ép mode khi debug; auto thì để AI router quyết định.
+    if mode == "rag":
+        return RouteDecision(route="rag", reason="User selected RAG only mode.", rewritten_question=question)
+    if mode == "tools":
+        return RouteDecision(route="l3_tools", reason="User selected Tools only mode.", rewritten_question=question)
+    return None
+
+
+def execute_route(route: RouteDecision, session: dict[str, Any], tools: GeekBrainTools) -> tuple[str, dict[str, Any]]:
+    # Sau khi router quyết định, executor chỉ chạy route tương ứng.
+    question = route.rewritten_question
+    if route.route == "agent_reasoning":
+        result = bonus_b(question, tools, route.service)
+        return "Bonus B agent reasoning", result
+    if route.route == "l4_memory":
+        result = l4_answer(question, session, tools)
+        return "L4 retrieval/tools + memory", result
+    if route.route == "l3_tools":
+        result = answer_dynamic_l3(tools, question)
+        return "L3 tools", result
+    return "L1/L2 RAG", rag_answer(question, session)
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
-    # Một endpoint duy nhất cho UI. Auto mode thử route theo thứ tự: Bonus B -> L4 -> L3 -> L1/L2 RAG.
+    # Một endpoint duy nhất cho UI. Auto mode để Claude route trước, rồi backend executor chạy route đó.
     question = request.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="question is required")
     session_id, session = get_session(request.session_id)
     tools = GeekBrainTools(str(ROOT / DEFAULT_DB_PATH))
+    route = forced_route(request.mode, question) or ai_route(question, session, tools)
+    try:
+        mode, result = execute_route(route, session, tools)
+        routing_decision = f"AI router selected {route.route}: {route.reason}"
+    except ToolError as error:
+        route = RouteDecision(route="rag", reason=f"Selected route could not execute ({error}); fell back to RAG.", rewritten_question=question)
+        mode, result = execute_route(route, session, tools)
+        routing_decision = route.reason
 
-    for handler, mode, routing in (
-        # Thứ tự này cố ý: câu điều tra/memory/tool nên được xử lý trước RAG mặc định.
-        (lambda q: bonus_b(q, tools), "Bonus B agent reasoning", "Matched open-ended investigation route."),
-        (lambda q: l4_answer(q, session, tools), "L4 retrieval/tools + memory", "Resolved follow-up references from compact session memory."),
-        (lambda q: answer_dynamic_l3(tools, q), "L3 tools", "Matched dynamic L3 tool planner."),
-    ):
-        try:
-            result = handler(question)
-            update_memory_from_result(session, question, result["answer"], result.get("evidence", {}))
-            if result.get("updates"):
-                session["state"].update(result["updates"])
-            return ChatResponse(session_id=session_id, mode=f"{mode} ({result.get('intent', '')})".strip(), answer=result["answer"], tools=result.get("tools", []), routing_decision=routing, pipeline_steps=result.get("pipeline_steps", []), sources=result.get("sources", []), evidence=result.get("evidence", {}), llm_input=result.get("llm_input", {}), memory=session)
-        except ToolError:
-            pass
-
-    result = rag_answer(question, session)
-    update_memory_from_result(session, question, result["answer"])
-    return ChatResponse(session_id=session_id, mode="L1/L2 RAG", answer=result["answer"], tools=result["tools"], routing_decision="Used Bedrock KB vector retrieval plus local BM25 supplement.", pipeline_steps=result["pipeline_steps"], sources=result["sources"], evidence={}, llm_input=result["llm_input"], memory=session)
+    update_memory_from_result(session, question, result["answer"], result.get("evidence", {}))
+    if result.get("updates"):
+        session["state"].update(result["updates"])
+    pipeline_steps = [
+        {"step": "AI route request", "detail": route.model_dump()},
+        *result.get("pipeline_steps", []),
+    ]
+    return ChatResponse(
+        session_id=session_id,
+        mode=f"{mode} ({result.get('intent', '')})".strip(),
+        answer=result["answer"],
+        tools=result.get("tools", []),
+        routing_decision=routing_decision,
+        pipeline_steps=pipeline_steps,
+        sources=result.get("sources", []),
+        evidence=result.get("evidence", {}),
+        llm_input=result.get("llm_input", {}),
+        memory=session,
+    )
