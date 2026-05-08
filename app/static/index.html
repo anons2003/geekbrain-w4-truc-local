@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>W4 GeekBrain AI Q&A</title>
+    <link rel="stylesheet" href="/static/styles.css?v=trace-layout-5" />
+  </head>
+  <body>
+    <main class="shell">
+      <!-- Header demo: hiển thị tên hệ thống, trạng thái API và nút ẩn/hiện sidebar ví dụ. -->
+      <section class="topbar">
+        <div>
+          <h1>W4 GeekBrain AI Q&A</h1>
+          <p>RAG, conflict-aware retrieval, and tool-grounded answers for the Week 4 demo.</p>
+        </div>
+        <div class="top-actions">
+          <button class="sidebar-toggle" id="examples-toggle" type="button" aria-controls="examples-panel" aria-pressed="false">
+            Hide Examples
+          </button>
+          <div class="status" id="status">Checking API</div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <!-- Examples là bộ câu hỏi mẫu để trainer kiểm tra nhanh từng level L1-L4 và Bonus. -->
+        <aside class="examples" id="examples-panel">
+          <div class="panel-title">Examples</div>
+          <div class="example-group">
+            <h2>L1</h2>
+            <button data-question="Who is the Team Platform lead?">Team Platform lead</button>
+            <button data-question="What is GeekBrain's API rate limit for PaymentGW?">PaymentGW rate limit</button>
+          </div>
+          <div class="example-group">
+            <h2>L2</h2>
+            <button data-question="What is PaymentGW's API rate limit?">Resolve v1/v2 conflict</button>
+            <button data-question="If Team Commerce discovers a P1 bug in OrderSvc at 21:00 on a Friday, can they deploy a fix? What is the process?">Friday P1 hotfix</button>
+          </div>
+          <div class="example-group">
+            <h2>L3</h2>
+            <button data-question="What was GeekBrain's total infrastructure cost across all services in Q1 2026?">Q1 total cost</button>
+            <button data-question="Is NotificationSvc currently meeting its SLA targets?">NotificationSvc SLA</button>
+            <button data-question="Which service currently handles the most requests per minute?">Highest RPM</button>
+          </div>
+          <div class="example-group">
+            <h2>L4</h2>
+            <button data-question="Which service had the highest infrastructure cost in March 2026?">Start cost investigation</button>
+            <button data-question="What was the main cause of the cost increase that month?">Follow-up: why spike?</button>
+            <button data-question="Which team is responsible?">Follow-up: team</button>
+            <button data-question="The postmortem mentioned a review deadline. Is it overdue?">Follow-up: deadline</button>
+          </div>
+          <div class="example-group">
+            <h2>Bonus</h2>
+            <button data-question="Is NotificationSvc in a healthy state? Assess its reliability and flag anything that needs attention.">Agent reasoning</button>
+          </div>
+        </aside>
+
+        <!-- Chat panel là luồng chính: user nhập câu hỏi, backend trả câu trả lời và trace. -->
+        <section class="chat-panel">
+          <div class="messages" id="messages">
+            <div class="message assistant">
+              <div class="bubble">
+                Ask an L1, L2, L3, or L4 question. Auto mode routes tool questions to structured data and the rest to Bedrock KB.
+              </div>
+            </div>
+          </div>
+
+          <form class="composer" id="chat-form">
+            <select id="mode" aria-label="Mode">
+              <option value="auto">Auto</option>
+              <option value="rag">RAG only</option>
+              <option value="tools">Tools only</option>
+            </select>
+            <textarea id="question" rows="2" placeholder="Ask about GeekBrain..." required></textarea>
+            <button type="submit">Send</button>
+          </form>
+        </section>
+
+        <!-- Trace panel phục vụ Bonus A: show routing, pipeline steps, tools, sources, LLM input và memory. -->
+        <aside class="details" id="trace-panel">
+          <!-- Splitter/resizer handle: kéo để mở rộng/thu nhỏ Trace khi chụp evidence. -->
+          <div
+            class="trace-resizer"
+            id="trace-resizer"
+            role="separator"
+            aria-label="Resize Trace panel"
+            aria-orientation="vertical"
+            aria-controls="trace-panel"
+            tabindex="0"
+            title="Drag to resize Trace panel"
+          ></div>
+          <div class="panel-title">Trace</div>
+          <div id="trace" class="trace-empty">No request yet.</div>
+        </aside>
+      </section>
+    </main>
+    <script src="/static/app.js?v=trace-layout-5"></script>
+  </body>
+</html>

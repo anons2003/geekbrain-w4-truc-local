@@ -1,0 +1,103 @@
+{
+  "level": 5,
+  "description": "Goal-Directed Investigation — multi-step reasoning across all sources",
+  "investigations": [
+    {
+      "id": "L5-01",
+      "prompt": "Assess whether PaymentGW is reliable and recommend improvements.",
+      "expected_steps": [
+        "Check current status (API) — healthy, p99=185ms, error=0.08%",
+        "Query incident history (DB) — 3 incidents in Q1 including a P1",
+        "Read postmortems — circuit breaker stuck, health check issue",
+        "Check SLA compliance (API vs DB) — currently within but borderline on latency",
+        "Check cost trends (DB) — March spike to $7,500",
+        "Read capacity planning — horizontal scaling needed",
+        "Synthesize and recommend"
+      ],
+      "expected_findings": "Currently healthy but had worst Q1 incident (P1, 3 hours). Circuit breaker review overdue (April 15). Latency 185ms close to 200ms SLA. Costs spiked in March.",
+      "data_sources_needed": [
+        "monitoring_api",
+        "database",
+        "knowledge_base"
+      ]
+    },
+    {
+      "id": "L5-02",
+      "prompt": "GeekBrain wants to cut infrastructure costs by 15% in Q2. Analyze current spending and recommend which services to optimize first.",
+      "expected_steps": [
+        "Query all service costs Q1 (DB) — total $56,350",
+        "Identify biggest: PaymentGW $16,500, FraudDetector $15,900",
+        "Check cost trends — which is growing fastest",
+        "Compare to SLA — can't optimize at expense of SLA",
+        "Check utilization (API) — is anything over/under-utilized",
+        "Read cost optimization initiative (docs)",
+        "Calculate 15% target = ~$8,450",
+        "Recommend specific areas"
+      ],
+      "expected_findings": "PaymentGW and FraudDetector are top targets. PaymentGW March spike was incident-driven. FraudDetector third-party cost = $4,500/quarter for ML inference.",
+      "data_sources_needed": [
+        "database",
+        "monitoring_api",
+        "knowledge_base"
+      ]
+    },
+    {
+      "id": "L5-03",
+      "prompt": "Which service is most at risk of SLA breach right now? What should be done about it?",
+      "expected_steps": [
+        "Check all services current metrics (API)",
+        "Get SLA targets (DB)",
+        "Compare each service",
+        "Identify breaches",
+        "Investigate root cause",
+        "Check team resources and capacity plans",
+        "Recommend"
+      ],
+      "expected_findings": "NotificationSvc actively breaching latency (3200ms vs 2000ms) and error rate (2.1% vs 1%). Team Engagement is smallest (4 people). SQS consumer scaling is top priority.",
+      "data_sources_needed": [
+        "monitoring_api",
+        "database",
+        "knowledge_base"
+      ]
+    },
+    {
+      "id": "L5-04",
+      "prompt": "Prepare a Q1 2026 reliability report card for all GeekBrain services.",
+      "expected_steps": [
+        "For each service: query incident count/severity (DB)",
+        "Calculate average metrics from daily_metrics (DB)",
+        "Get SLA targets (DB)",
+        "Check current status (API)",
+        "Cross-reference postmortems (docs)",
+        "Produce structured per-service summary"
+      ],
+      "expected_findings": "PaymentGW: 3 incidents (worst), NotificationSvc: degraded now, AuthSvc: 1 security incident, FraudDetector: 1 model drift, OrderSvc/ReportingSvc: relatively stable.",
+      "data_sources_needed": [
+        "database",
+        "monitoring_api",
+        "knowledge_base"
+      ]
+    },
+    {
+      "id": "L5-05",
+      "prompt": "GeekBrain is considering whether to add more engineers to Team Engagement or Team Platform. Based on current data, which team needs reinforcement more urgently and why?",
+      "expected_steps": [
+        "Check current service health for both teams' services (API) — NotificationSvc degraded, PaymentGW healthy",
+        "Query incident history for both teams (DB) — Platform had 3 PaymentGW + 1 AuthSvc incidents; Engagement had 1",
+        "Check team sizes (docs) — Platform has 8, Engagement has 4",
+        "Compute incidents-per-person ratio",
+        "Check SLA status for owned services (API + DB)",
+        "Read capacity planning for upcoming scaling needs (docs)",
+        "Read Q1 review for concerns raised (docs)",
+        "Make recommendation with justification"
+      ],
+      "expected_findings": "Team Engagement: 4 people, service actively breaching SLA, merchants complaining, SQS scaling needed — understaffed for current problems. Team Platform: 8 people, more incidents but service is currently stable, and 2 new hires already approved in Q1 review. Recommendation: Team Engagement is more urgent.",
+      "data_sources_needed": [
+        "monitoring_api",
+        "database",
+        "knowledge_base"
+      ]
+    }
+  ],
+  "note": "5 of 6 questions included. Additional questions held back for demo day."
+}

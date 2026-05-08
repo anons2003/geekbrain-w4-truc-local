@@ -1,0 +1,77 @@
+{
+  "level": 1,
+  "description": "Single-Fact Retrieval — answer from one document",
+  "questions": [
+    {
+      "id": "L1-01",
+      "question": "What is the current API rate limit for PaymentGW?",
+      "expected_answer": "1000 requests per minute per merchant",
+      "source_document": "api_reference_v2.md",
+      "grading_notes": "Must cite v2 or state 1000. Citing v1's 500 without acknowledging v2 is wrong."
+    },
+    {
+      "id": "L1-02",
+      "question": "Who leads Team Platform and what services do they own?",
+      "expected_answer": "Alex Chen. Team Platform owns PaymentGW and AuthSvc.",
+      "source_document": "team_platform.md",
+      "grading_notes": "Both lead name and owned services must be correct."
+    },
+    {
+      "id": "L1-03",
+      "question": "What was the root cause of the March 5, 2026 PaymentGW outage?",
+      "expected_answer": "The circuit breaker got stuck in the OPEN state because the health check endpoint was misconfigured — it misinterpreted the upstream bank's 503 response as a false positive.",
+      "source_document": "postmortem_INC005_paymentgw_mar.md",
+      "grading_notes": "Must mention circuit breaker stuck open and health check misconfiguration."
+    },
+    {
+      "id": "L1-04",
+      "question": "What is GeekBrain's data retention policy for transaction logs?",
+      "expected_answer": "7 years",
+      "source_document": "security_policy.md",
+      "grading_notes": "Must state 7 years specifically."
+    },
+    {
+      "id": "L1-05",
+      "question": "What are GeekBrain's production deployment windows?",
+      "expected_answer": "Monday through Thursday, 09:00 to 17:00 VN time. Deployments are frozen from Friday 18:00 to Monday 08:00.",
+      "source_document": "deployment_policy.md",
+      "grading_notes": "Must mention both allowed window and freeze period."
+    },
+    {
+      "id": "L1-06",
+      "question": "What authentication method does the PaymentGW API use?",
+      "expected_answer": "API key plus HMAC-SHA256 signature",
+      "source_document": "api_reference_v2.md",
+      "grading_notes": "Must mention both API key and HMAC signature."
+    },
+    {
+      "id": "L1-07",
+      "question": "What message queue does NotificationSvc use?",
+      "expected_answer": "Amazon SQS (Simple Queue Service)",
+      "source_document": "service_notificationsvc.md",
+      "grading_notes": "SQS. Accept 'Amazon SQS' or just 'SQS'."
+    },
+    {
+      "id": "L1-08",
+      "question": "After the March 5 PaymentGW incident, a circuit breaker review was scheduled. What was the deadline?",
+      "expected_answer": "April 15, 2026",
+      "source_document": "postmortem_INC005_paymentgw_mar.md",
+      "grading_notes": "Exact date required."
+    },
+    {
+      "id": "L1-09",
+      "question": "What programming language is AuthSvc written in?",
+      "expected_answer": "Go",
+      "source_document": "service_authsvc.md",
+      "grading_notes": "Simple fact from architecture doc."
+    },
+    {
+      "id": "L1-10",
+      "question": "How often does GeekBrain rotate JWT signing keys?",
+      "expected_answer": "Every 30 days",
+      "source_document": "security_policy.md",
+      "grading_notes": "Must say 30 days. Accept 'monthly' as equivalent."
+    }
+  ],
+  "note": "10 of 12 questions included. Additional questions held back for demo day."
+}

@@ -1,0 +1,97 @@
+{
+  "level": 3,
+  "description": "Grounded Computation — requires tools, NOT answerable from docs",
+  "questions": [
+    {
+      "id": "L3-01",
+      "question": "What is PaymentGW's current p99 latency?",
+      "expected_answer": "Approximately 185ms (varies slightly due to live jitter)",
+      "data_source": "monitoring_api",
+      "tool_needed": "Service Metrics",
+      "computation": "Direct value from API",
+      "grading_notes": "Must be from live API. Value ~185ms +/-5%."
+    },
+    {
+      "id": "L3-02",
+      "question": "What was GeekBrain's total infrastructure cost across all services in Q1 2026?",
+      "expected_answer": "$56,350",
+      "data_source": "database",
+      "tool_needed": "Database Query",
+      "computation": "SUM for Jan+Feb+Mar across all services = 16500+6600+4600+2550+10200+15900 = 56350",
+      "grading_notes": "Must be exact: $56,350."
+    },
+    {
+      "id": "L3-03",
+      "question": "Which service had the highest total cost in March 2026?",
+      "expected_answer": "PaymentGW at $7,500",
+      "data_source": "database",
+      "tool_needed": "Database Query",
+      "computation": "SELECT service, total_cost WHERE month=2026-03 ORDER BY total_cost DESC",
+      "grading_notes": "PaymentGW and $7,500."
+    },
+    {
+      "id": "L3-04",
+      "question": "Is PaymentGW's current error rate within its SLA target?",
+      "expected_answer": "Yes. Current error rate is approximately 0.08%, below SLA target of 0.1%.",
+      "data_source": "both",
+      "tool_needed": "Service Metrics + Database Query",
+      "computation": "Compare current 0.08% to target 0.1%",
+      "grading_notes": "Must state both current value AND target."
+    },
+    {
+      "id": "L3-05",
+      "question": "Compare PaymentGW's current p99 latency to its Q1 2026 daily average.",
+      "expected_answer": "Current ~185ms. Q1 daily average ~183ms. Current is slightly above Q1 average.",
+      "data_source": "both",
+      "tool_needed": "Service Metrics + Database Query",
+      "computation": "API current ~185ms vs DB AVG for Jan-Mar ~183ms",
+      "grading_notes": "Must get both values from respective sources."
+    },
+    {
+      "id": "L3-06",
+      "question": "Is NotificationSvc currently meeting its SLA targets?",
+      "expected_answer": "No. Breaching both latency (3200ms vs 2000ms target) and error rate (2.1% vs 1.0% target).",
+      "data_source": "both",
+      "tool_needed": "Service Metrics + Database Query",
+      "computation": "Compare 3200 > 2000 and 2.1 > 1.0",
+      "grading_notes": "Must identify BOTH breaches."
+    },
+    {
+      "id": "L3-07",
+      "question": "How much did PaymentGW's total cost increase from Q4 2025 to Q1 2026?",
+      "expected_answer": "Q4 2025: $11,700. Q1 2026: $16,500. Increase: $4,800 (approximately 41%).",
+      "data_source": "database",
+      "tool_needed": "Database Query",
+      "computation": "Q4=11700, Q1=16500, diff=4800, pct=41%",
+      "grading_notes": "Must provide both absolute and percentage."
+    },
+    {
+      "id": "L3-08",
+      "question": "Which service currently handles the most requests per minute?",
+      "expected_answer": "AuthSvc at approximately 28,000 requests per minute.",
+      "data_source": "monitoring_api",
+      "tool_needed": "Service Metrics (multiple services)",
+      "computation": "Compare rpm across all services",
+      "grading_notes": "Must check multiple services. AuthSvc=28000 is highest."
+    },
+    {
+      "id": "L3-09",
+      "question": "What is FraudDetector's current CPU utilization, and how does it compare to other services?",
+      "expected_answer": "FraudDetector CPU is approximately 72%. Compared to others: NotificationSvc is highest at 88%, PaymentGW at 62%, ReportingSvc at 55%, AuthSvc at 45%, OrderSvc at 38%.",
+      "data_source": "monitoring_api",
+      "tool_needed": "Service Metrics (multiple services)",
+      "computation": "Retrieve CPU for all services and rank",
+      "grading_notes": "Must get FraudDetector's value and ideally compare. NotificationSvc should be flagged as highest."
+    },
+    {
+      "id": "L3-10",
+      "question": "How many total incidents occurred in Q1 2026, and which service had the most?",
+      "expected_answer": "7 incidents in Q1 2026 (INC-001 through INC-007; INC-008 was April 2). PaymentGW had the most with 3 incidents (INC-001, INC-003, INC-005).",
+      "data_source": "database",
+      "tool_needed": "Database Query",
+      "computation": "COUNT incidents WHERE date between 2026-01-01 and 2026-03-31, GROUP BY service",
+      "grading_notes": "Must correctly exclude INC-008 (April). PaymentGW = 3."
+    }
+  ],
+  "note": "10 of 12 questions included. Additional questions held back for demo day."
+}

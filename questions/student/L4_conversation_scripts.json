@@ -1,0 +1,187 @@
+{
+  "level": 4,
+  "description": "Conversational Continuity — multi-turn, requires memory + tools",
+  "conversations": [
+    {
+      "id": "L4-01",
+      "title": "Cost Investigation",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "Which service had the highest cost in March 2026?",
+          "expected_answer": "PaymentGW at $7,500.",
+          "requires": "tool (DB query)"
+        },
+        {
+          "turn": 2,
+          "user": "Why did its costs spike that month?",
+          "expected_answer": "The March 5 P1 outage caused significant catch-up processing — retry storms and compensatory batch processing.",
+          "requires": "memory + retrieval"
+        },
+        {
+          "turn": 3,
+          "user": "Is it running normally right now?",
+          "expected_answer": "Yes, PaymentGW is currently healthy with p99 ~185ms and error rate 0.08%.",
+          "requires": "memory + tool (API)"
+        },
+        {
+          "turn": 4,
+          "user": "Which team is responsible for it?",
+          "expected_answer": "Team Platform, led by Alex Chen.",
+          "requires": "memory + retrieval"
+        }
+      ]
+    },
+    {
+      "id": "L4-02",
+      "title": "SLA Compliance Check",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "Is NotificationSvc currently meeting its SLA targets?",
+          "expected_answer": "No. p99 ~3200ms vs 2000ms target. Error rate ~2.1% vs 1.0% target. Both breaching.",
+          "requires": "tool (API + DB)"
+        },
+        {
+          "turn": 2,
+          "user": "Has it had any incidents recently?",
+          "expected_answer": "Yes, INC-007 on March 20 — SQS dead letter queue overflow, 45 minutes.",
+          "requires": "memory + tool (DB)"
+        },
+        {
+          "turn": 3,
+          "user": "What team owns it and who should I contact?",
+          "expected_answer": "Team Engagement, led by Nina Shah.",
+          "requires": "memory + retrieval"
+        },
+        {
+          "turn": 4,
+          "user": "What's their on-call rotation?",
+          "expected_answer": "Monthly rotation plus PagerDuty.",
+          "requires": "memory + retrieval"
+        }
+      ]
+    },
+    {
+      "id": "L4-03",
+      "title": "Incident Follow-up",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "Tell me about the most severe incident in Q1 2026.",
+          "expected_answer": "INC-005: PaymentGW P1 on March 5, 2026. Duration: 3 hours. Circuit breaker stuck open.",
+          "requires": "tool (DB)"
+        },
+        {
+          "turn": 2,
+          "user": "What exactly caused it?",
+          "expected_answer": "Upstream VCB bank API timeouts triggered the circuit breaker. Health check endpoint was misconfigured — misinterpreted bank's 503.",
+          "requires": "memory + retrieval"
+        },
+        {
+          "turn": 3,
+          "user": "Was there a follow-up action with a deadline?",
+          "expected_answer": "Yes, circuit breaker review scheduled for April 15, 2026.",
+          "requires": "memory + retrieval"
+        },
+        {
+          "turn": 4,
+          "user": "Is that overdue?",
+          "expected_answer": "Yes, ~2+ weeks overdue.",
+          "requires": "memory + reasoning (date comparison)"
+        }
+      ]
+    },
+    {
+      "id": "L4-04",
+      "title": "Capacity Planning",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "What is AuthSvc's current request volume?",
+          "expected_answer": "Approximately 28,000 requests per minute.",
+          "requires": "tool (API)"
+        },
+        {
+          "turn": 2,
+          "user": "Is that close to any planned capacity threshold?",
+          "expected_answer": "Yes, capacity planning mentions preparing for 35,000 rpm.",
+          "requires": "memory + retrieval"
+        },
+        {
+          "turn": 3,
+          "user": "How fast has it been growing?",
+          "expected_answer": "Q1 data: ~24k rpm in Jan to ~27k in Mar — about 12-13% quarterly growth.",
+          "requires": "memory + tool (DB)"
+        },
+        {
+          "turn": 4,
+          "user": "At that growth rate, roughly when would it hit 35k?",
+          "expected_answer": "Approximately 2-3 quarters, around Q4 2026 or Q1 2027.",
+          "requires": "memory + computation"
+        }
+      ]
+    },
+    {
+      "id": "L4-05",
+      "title": "Security Review",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "When was the last security-related incident?",
+          "expected_answer": "INC-004: AuthSvc JWT rotation failure, February 22, 2026.",
+          "requires": "tool (DB)"
+        },
+        {
+          "turn": 2,
+          "user": "What went wrong?",
+          "expected_answer": "JWT signing key rotation script failed silently — returned exit code 0 despite error. Stale key caused auth failures.",
+          "requires": "memory + retrieval"
+        },
+        {
+          "turn": 3,
+          "user": "Does the security policy cover this kind of failure?",
+          "expected_answer": "Yes, policy mandates JWT rotation every 30 days. The failure was in automation, not policy.",
+          "requires": "memory + retrieval"
+        },
+        {
+          "turn": 4,
+          "user": "What did the team change to prevent it happening again?",
+          "expected_answer": "Pre-rotation validation (test sign + verify before swap), key age monitoring (alert if >32 days), rewrote error handling.",
+          "requires": "memory + retrieval"
+        }
+      ]
+    },
+    {
+      "id": "L4-06",
+      "title": "FraudDetector Deep Dive",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "What is FraudDetector's current error rate?",
+          "expected_answer": "Approximately 0.03%.",
+          "requires": "tool (API)"
+        },
+        {
+          "turn": 2,
+          "user": "Is that within its SLA?",
+          "expected_answer": "Yes, target is 0.05%. Current 0.03% is well within.",
+          "requires": "memory + tool (DB for SLA target)"
+        },
+        {
+          "turn": 3,
+          "user": "But it had a model drift issue recently, right? What happened?",
+          "expected_answer": "INC-006 on March 12: false positive rate spiked from 2% to 15% due to Lunar New Year spending patterns not in training data. Retrained model, adjusted threshold from 0.7 to 0.75.",
+          "requires": "memory + retrieval (postmortem)"
+        },
+        {
+          "turn": 4,
+          "user": "How often is the model retrained now?",
+          "expected_answer": "Quarterly scheduled retraining was recommended after the incident. Previously it was ad-hoc.",
+          "requires": "memory + retrieval (runbook/postmortem)"
+        }
+      ]
+    }
+  ],
+  "note": "6 of 8 questions included. Additional questions held back for demo day."
+}

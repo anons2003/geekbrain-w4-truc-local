@@ -1,0 +1,9 @@
+incident_id,service,date,severity,duration_minutes,root_cause,resolution,team_responsible,reported_by
+INC-001,PaymentGW,2026-01-15,P2,45,Database connection pool exhaustion under peak load,Increased pool size from 20 to 50 and added connection monitoring,Team Platform,Automated alert
+INC-002,OrderSvc,2026-01-28,P3,120,Memory leak in order validation module,Patched validation logic and added memory usage monitoring,Team Commerce,Kyle Reed
+INC-003,PaymentGW,2026-02-10,P3,30,SSL certificate approaching expiry triggered alert,Renewed certificate and implemented auto-renewal via ACM,Team Platform,Automated alert
+INC-004,AuthSvc,2026-02-22,P2,60,JWT signing key rotation script failed silently,Fixed rotation script and added pre-rotation validation step and alert on failure,Team Platform,Ben Torres
+INC-005,PaymentGW,2026-03-05,P1,180,Circuit breaker stuck open after upstream bank API timeout cascade,Manual circuit breaker reset and added fallback routing to secondary bank and implemented health check ping,Team Platform,Automated alert
+INC-006,FraudDetector,2026-03-12,P2,90,Model drift — false positive rate spiked from 2% to 15%,Retrained model with Feb-Mar data and adjusted decision threshold from 0.7 to 0.75,Team Data,Sarah Wells
+INC-007,NotificationSvc,2026-03-20,P3,45,SQS dead letter queue overflow — 50k+ unprocessable messages,Increased DLQ retention to 14 days and added CloudWatch alarm at 10k messages and deployed consumer fix,Team Engagement,Owen Clark
+INC-008,ReportingSvc,2026-04-02,P2,120,ETL pipeline timeout — daily report query exceeded 30-min limit on grown dataset,Optimized Redshift query with sort keys and added pagination for large result sets,Team Data,Tom Hayes

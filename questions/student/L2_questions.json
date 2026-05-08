@@ -1,0 +1,99 @@
+{
+  "level": 2,
+  "description": "Multi-Source Reasoning — synthesize across documents or resolve conflicts",
+  "questions": [
+    {
+      "id": "L2-01",
+      "question": "What is PaymentGW's API rate limit?",
+      "expected_answer": "1000 requests per minute (per v2, effective March 2025). The archived v1 document lists 500 requests per minute, but v2 supersedes it.",
+      "source_documents": [
+        "api_reference_v2.md",
+        "api_reference_v1_archived.md"
+      ],
+      "reasoning_required": "Resolve version conflict between v1 (500) and v2 (1000).",
+      "grading_notes": "Just answering '1000' is acceptable but lower score than noting the discrepancy."
+    },
+    {
+      "id": "L2-02",
+      "question": "If Team Commerce discovers a P1 bug in OrderSvc at 21:00 on a Friday, can they deploy a fix? What is the process?",
+      "expected_answer": "Yes. The deployment freeze (Fri 18:00 - Mon 08:00) normally blocks deploys, but the incident response policy allows P1 hotfixes to override the freeze with VP Engineering (Mark Sullivan) approval.",
+      "source_documents": [
+        "deployment_policy.md",
+        "incident_response_policy.md"
+      ],
+      "reasoning_required": "Synthesize freeze policy + P1 exception + who approves.",
+      "grading_notes": "Must mention: (1) freeze is active, (2) P1 overrides it, (3) VP Mark Sullivan approval."
+    },
+    {
+      "id": "L2-03",
+      "question": "Which services would be directly affected if AuthSvc goes completely down?",
+      "expected_answer": "PaymentGW and OrderSvc — both depend on AuthSvc for token validation. All other services may also be impacted since AuthSvc is described as the single point of auth.",
+      "source_documents": [
+        "service_authsvc.md",
+        "service_paymentgw.md",
+        "service_ordersvc.md"
+      ],
+      "reasoning_required": "Cross-reference dependency graph with AuthSvc description.",
+      "grading_notes": "Must identify PaymentGW and OrderSvc as direct dependencies."
+    },
+    {
+      "id": "L2-04",
+      "question": "Based on the Q1 review and the cost optimization initiative, which services are the top priorities for cost reduction and why?",
+      "expected_answer": "PaymentGW (costs growing faster than transaction volume) and FraudDetector (expensive ML inference). Both explicitly named in the cost optimization initiative.",
+      "source_documents": [
+        "q1_2026_review_notes.md",
+        "cost_optimization_initiative.md"
+      ],
+      "reasoning_required": "Combine Q1 review concerns with initiative targets.",
+      "grading_notes": "Must name both services and provide reasons."
+    },
+    {
+      "id": "L2-05",
+      "question": "What common lessons emerged from the March 2026 incidents at PaymentGW and FraudDetector?",
+      "expected_answer": "Both highlighted the need for better automated monitoring and detection. PaymentGW's circuit breaker lacked a proper health check, and FraudDetector's model drift was detected manually. Both recommended automated alerting.",
+      "source_documents": [
+        "postmortem_INC005_paymentgw_mar.md",
+        "postmortem_INC006_frauddetector.md"
+      ],
+      "reasoning_required": "Synthesize lessons across two postmortems.",
+      "grading_notes": "Must identify automated monitoring/detection as the common thread."
+    },
+    {
+      "id": "L2-06",
+      "question": "What should a new engineer joining Team Data know about the systems they'll work with, based on the onboarding guide and team information?",
+      "expected_answer": "Team Data (lead: Ryan Blake) owns ReportingSvc and FraudDetector. Per onboarding: VPN access, GitHub org invite, AWS console via team lead. Systems: Redshift/S3 (ReportingSvc), SageMaker/DynamoDB (FraudDetector). Complete PCI-DSS security training, shadow on-call first week.",
+      "source_documents": [
+        "onboarding_guide.md",
+        "team_data.md",
+        "service_reportingsvc.md",
+        "service_frauddetector.md"
+      ],
+      "reasoning_required": "Combine onboarding process with team-specific knowledge.",
+      "grading_notes": "Must combine general onboarding with Team Data specifics."
+    },
+    {
+      "id": "L2-07",
+      "question": "The Q1 2026 review mentioned concerns about NotificationSvc. What specific issues were raised, and what does the capacity planning document propose to fix them?",
+      "expected_answer": "Q1 review: merchants complaining about slow delivery confirmations. Capacity planning: SQS consumer auto-scaling is the top priority — current fixed consumer count cannot keep up with growing message volume. The architecture review also flagged this and recommended auto-scaling consumers based on queue depth.",
+      "source_documents": [
+        "q1_2026_review_notes.md",
+        "capacity_planning_q2_2026.md",
+        "architecture_review_feb_2026.md"
+      ],
+      "reasoning_required": "Connect problem (Q1 review) with proposed solution (capacity planning + architecture review).",
+      "grading_notes": "Must link the merchant complaints to the SQS consumer scaling recommendation."
+    },
+    {
+      "id": "L2-08",
+      "question": "What is the complete escalation path for a P1 incident on PaymentGW, from detection to CTO notification? Include specific names and timeframes.",
+      "expected_answer": "Automated alert or on-call engineer detects → Team lead Alex Chen within 15 minutes → VP Engineering Mark Sullivan within 30 minutes → CTO James Wright within 1 hour. Communication: post in Slack #incidents, update status page, customer comms for P1.",
+      "source_documents": [
+        "incident_response_policy.md",
+        "team_platform.md"
+      ],
+      "reasoning_required": "Combine generic escalation policy with team-specific names and ownership.",
+      "grading_notes": "Must include all three escalation levels with correct names and timeframes."
+    }
+  ],
+  "note": "8 of 10 questions included. Additional questions held back for demo day."
+}
